@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-test-app
+  labels:
+    app: webhook-test-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webhook-test-app
+  template:
+    metadata:
+      labels:
+        app: webhook-test-app
+    spec:
+      containers:
+      - name: webhook-app
+        image: your-username/webhook-test-app:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: MESSAGE_FILE_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: webhook-app-config
+              key: message-file-path
+        - name: ENVIRONMENT
+          value: "production"
+        volumeMounts:
+        - name: message-storage
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: message-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-test-service
+spec:
+  selector:
+    app: webhook-test-app
+  ports:
+  - port: 80
+    targetPort: 5000
+  type: LoadBalancer

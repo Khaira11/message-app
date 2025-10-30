@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webhook-app-config
+data:
+  initial-message: |
+    Hello! Webhook test app is running in Kubernetes! 🚀
+  message-file-path: "/data/message.txt"
