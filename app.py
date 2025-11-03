@@ -118,7 +118,7 @@ def health_check():
 if __name__ == '__main__':
     # Create initial message file if it doesn't exist
     if not os.path.exists(MESSAGE_FILE):
-        update_message("Hello! Webhook test is working! 🚀 Third deployment.")
+        update_message("Hello! Webhook test is working! 🚀 Third time deployment.")
     
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
