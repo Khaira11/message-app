@@ -22,7 +22,6 @@ pipeline {
                 sh '''
                 echo "🏗️ Building Docker image..."
                 docker build -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
-                docker run -d -p 5000:5000 ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
                 '''
             }
         }
@@ -39,7 +38,23 @@ pipeline {
             }
         }
 
-    
+        stage('Deploy to Kubernetes') {
+            steps {
+                withKubeConfig([credentialsId: 'k8s-credential']) {
+                    sh '''
+                    echo "🚀 Deploying application to Kubernetes..."
+                    
+                    # Replace the image placeholder dynamically
+                    sed -i "s|IMAGE_PLACEHOLDER|${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}|g" ${DEPLOYMENT_FILE}
+
+                    # Apply deployment
+                    kubectl apply -f ${DEPLOYMENT_FILE}
+                    kubectl rollout status deployment/${KUBE_DEPLOYMENT} -n ${KUBE_NAMESPACE}
+                    '''
+                }
+            }
+        }
+    }
 
     post {
         always {
