@@ -7,6 +7,9 @@ pipeline {
         IMAGE_TAG = "build-${BUILD_NUMBER}"  // unique tag per build
         CONTAINER_NAME = "message-app-container"
         APP_PORT = "5000"
+        K8S_NAMESPACE = "default"
+        K8S_DEPLOYMENT_NAME = "message-app"
+        K8S_CONTAINER_PORT = "5000"
     }
 
     stages {
@@ -37,10 +40,10 @@ pipeline {
             }
         }
 
-        stage('Run Docker Container') {
+        stage('Run Docker Container (Test)') {
             steps {
                 sh '''
-                echo "🚀 Starting container from the built image..."
+                echo "🚀 Starting container from the built image for testing..."
 
                 # Stop and remove any previous container with same name
                 if [ "$(docker ps -aq -f name=${CONTAINER_NAME})" ]; then
@@ -55,13 +58,108 @@ pipeline {
                 '''
             }
         }
+
+        stage('Kubernetes Deployment') {
+            steps {
+                echo '🚀 Deploying to Kubernetes...'
+                sh '''
+                # Create Kubernetes deployment YAML
+                cat > k8s-deployment.yaml <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${K8S_DEPLOYMENT_NAME}
+  namespace: ${K8S_NAMESPACE}
+  labels:
+    app: message-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: message-app
+  template:
+    metadata:
+      labels:
+        app: message-app
+    spec:
+      containers:
+      - name: message-app
+        image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+        ports:
+        - containerPort: ${K8S_CONTAINER_PORT}
+        env:
+        - name: PORT
+          value: "${K8S_CONTAINER_PORT}"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${K8S_DEPLOYMENT_NAME}-service
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: message-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: ${K8S_CONTAINER_PORT}
+  type: LoadBalancer
+EOF
+
+                # Apply Kubernetes deployment
+                kubectl apply -f k8s-deployment.yaml
+                '''
+            }
+        }
+
+        stage('Verify Kubernetes Deployment') {
+            steps {
+                sh '''
+                echo "📊 Checking deployment status..."
+                kubectl rollout status deployment/${K8S_DEPLOYMENT_NAME} -n ${K8S_NAMESPACE} --timeout=300s
+                
+                echo "🔍 Checking pods..."
+                kubectl get pods -n ${K8S_NAMESPACE} -l app=message-app
+                
+                echo "🌐 Checking services..."
+                kubectl get svc -n ${K8S_NAMESPACE} | grep ${K8S_DEPLOYMENT_NAME}
+                '''
+            }
+        }
     }
 
     post {
         always {
             echo "✅ Pipeline completed. Build number: ${BUILD_NUMBER}"
-            sh 'docker system prune -af'
+            sh '''
+            # Clean up local Docker container
+            if [ "$(docker ps -aq -f name=${CONTAINER_NAME})" ]; then
+                docker rm -f ${CONTAINER_NAME} || true
+            fi
+            docker system prune -af
+            '''
+        }
+        success {
+            echo "🎉 Deployment successful! Application is running in Kubernetes."
+            sh '''
+            echo "📋 Final deployment status:"
+            kubectl get deployment ${K8S_DEPLOYMENT_NAME} -n ${K8S_NAMESPACE}
+            '''
+        }
+        failure {
+            echo "❌ Deployment failed. Check logs for details."
+            sh '''
+            # Get deployment logs for debugging
+            kubectl describe deployment ${K8S_DEPLOYMENT_NAME} -n ${K8S_NAMESPACE} || true
+            kubectl logs -l app=message-app -n ${K8S_NAMESPACE} --tail=50 || true
+            '''
         }
     }
 }
-
