@@ -39,21 +39,18 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes') {
-            steps {
-                withKubeConfig([credentialsId: 'k8s-kubeconfig']) {
-                    sh '''
-                    echo "🚀 Deploying application to Kubernetes..."
-                    
-                    # Replace the image placeholder dynamically
-                    sed -i "s|IMAGE_PLACEHOLDER|${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}|g" ${DEPLOYMENT_FILE}
-
-                    # Apply deployment
-                    kubectl apply -f ${DEPLOYMENT_FILE}
-                    kubectl rollout status deployment/${KUBE_DEPLOYMENT} -n ${KUBE_NAMESPACE}
-                    '''
-                }
-            }
+    steps {
+        withKubeConfig([credentialsId: 'k8s-kubeconfig']) {
+            sh '''
+                set -e  # Exit immediately on any error
+                echo "🚀 Deploying application to Kubernetes..."
+                sed -i "s|IMAGE_PLACEHOLDER|docker.io/khaira23/message-app:build-${BUILD_NUMBER}|g" k8s/deployment.yaml
+                kubectl apply -f k8s/deployment.yaml
+                kubectl rollout status deployment/webhook-test-app -n default --timeout=300s
+            '''
         }
+    }
+}
     }
 
     post {
