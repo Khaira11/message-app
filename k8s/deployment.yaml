@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: flask-deployment
+  name: webhook-test-app
   labels:
     app: flask-deployment
 spec:
