@@ -3,16 +3,16 @@ kind: Deployment
 metadata:
   name: webhook-test-app
   labels:
-    app: flask-deployment
+    app: webhook-test-app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: flask-deployment
+      app: webhook-test-app
   template:
     metadata:
       labels:
-        app: flask-deployment
+        app: webhook-test-app
     spec:
       containers:
       - name: webhook-app
